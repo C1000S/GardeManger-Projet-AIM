@@ -1,0 +1,361 @@
+openapi: 3.0.3
+info:
+  title: GardeManger API
+  version: 0.1.0
+  description: >
+    Contrat d'API REST de GardeManger (anti-gaspillage alimentaire).
+    FIGÉ — toute modification se discute en équipe (impacte back + Android).
+servers:
+  - url: http://localhost:3000/api
+    description: Développement local
+
+tags:
+  - name: Auth
+  - name: Pantries
+  - name: Items
+  - name: Products
+  - name: Sync
+
+paths:
+  /health:
+    get:
+      summary: Statut du service
+      responses:
+        '200': { description: OK }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Créer un compte
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterInput' }
+      responses:
+        '201':
+          description: Compte créé + token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Se connecter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginInput' }
+      responses:
+        '200':
+          description: Token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Utilisateur courant
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Utilisateur
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+  /pantries:
+    get:
+      tags: [Pantries]
+      summary: Mes garde-mangers
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pantry' }
+    post:
+      tags: [Pantries]
+      summary: Créer un garde-manger
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+      responses:
+        '201':
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pantry' }
+
+  /pantries/{id}:
+    get:
+      tags: [Pantries]
+      summary: Détail d'un garde-manger
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Garde-manger
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pantry' }
+    patch:
+      tags: [Pantries]
+      summary: Modifier
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Modifié }
+    delete:
+      tags: [Pantries]
+      summary: Supprimer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Supprimé }
+
+  /pantries/{id}/members:
+    post:
+      tags: [Pantries]
+      summary: Ajouter un membre (partage)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string }
+      responses:
+        '201': { description: Membre ajouté }
+
+  /pantries/{pantryId}/items:
+    get:
+      tags: [Items]
+      summary: Inventaire (filtrable)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: pantryId, in: path, required: true, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: location, in: query, schema: { type: string, enum: [frigo, congelateur, armoire, autre] } }
+        - { name: status, in: query, schema: { type: string, enum: [actif, consomme, perime, jete] } }
+        - { name: expiringBefore, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Item' }
+    post:
+      tags: [Items]
+      summary: Ajouter un item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: pantryId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemInput' }
+      responses:
+        '201':
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+
+  /pantries/{pantryId}/items/expiring:
+    get:
+      tags: [Items]
+      summary: Items qui périment bientôt (alertes/suggestions)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: pantryId, in: path, required: true, schema: { type: string } }
+        - { name: days, in: query, schema: { type: integer, default: 3 } }
+      responses:
+        '200':
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Item' }
+
+  /items/{id}:
+    get:
+      tags: [Items]
+      summary: Détail d'un item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+    patch:
+      tags: [Items]
+      summary: Modifier (ex. marquer consommé)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Modifié }
+    delete:
+      tags: [Items]
+      summary: Supprimer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Supprimé }
+
+  /products:
+    get:
+      tags: [Products]
+      summary: Rechercher dans le catalogue
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Produits
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+    post:
+      tags: [Products]
+      summary: Créer un produit manuellement
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Créé }
+
+  /products/{barcode}:
+    get:
+      tags: [Products]
+      summary: Produit par code-barres (cache local, sinon Open Food Facts)
+      parameters:
+        - { name: barcode, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Produit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404': { description: Introuvable }
+
+  /sync/changes:
+    get:
+      tags: [Sync]
+      summary: PULL — changements depuis un horodatage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200': { description: Changements }
+
+  /sync/push:
+    post:
+      tags: [Sync]
+      summary: PUSH — appliquer les changements locaux
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Résultat de la synchro }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterInput:
+      type: object
+      required: [email, password, name]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        name: { type: string }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        dietaryPreferences:
+          type: object
+          properties:
+            restrictions: { type: array, items: { type: string } }
+            allergens: { type: array, items: { type: string } }
+    Pantry:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        members: { type: array, items: { type: string } }
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        barcode: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        imageUrl: { type: string, nullable: true }
+        nutriScore: { type: string, enum: [a, b, c, d, e], nullable: true }
+        source: { type: string, enum: [openfoodfacts, manuel] }
+    Item:
+      type: object
+      properties:
+        id: { type: string }
+        pantry: { type: string }
+        product: { type: string, nullable: true }
+        label: { type: string }
+        quantity: { type: number }
+        unit: { type: string }
+        expirationDate: { type: string, format: date-time, nullable: true }
+        location: { type: string, enum: [frigo, congelateur, armoire, autre] }
+        status: { type: string, enum: [actif, consomme, perime, jete] }
+        addedBy: { type: string }
+    ItemInput:
+      type: object
+      properties:
+        product: { type: string, nullable: true }
+        label: { type: string }
+        quantity: { type: number }
+        unit: { type: string }
+        expirationDate: { type: string, format: date-time, nullable: true }
+        location: { type: string, enum: [frigo, congelateur, armoire, autre] }

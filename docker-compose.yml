@@ -1,0 +1,31 @@
+services:
+  api:
+    build: ./backend
+    container_name: gardemanger-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGODB_URI: mongodb://mongo:27017/gardemanger
+      JWT_SECRET: dev-secret-a-changer
+      JWT_EXPIRES_IN: 7d
+    depends_on:
+      - mongo
+    volumes:
+      # Hot-reload du code en dev (le node_modules du conteneur est préservé)
+      - ./backend/src:/app/src
+    command: npm run dev
+
+  mongo:
+    image: mongo:7
+    container_name: gardemanger-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
